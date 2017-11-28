@@ -1,0 +1,1 @@
+CREATE DATABASE DEV_INFG_CelulaQualidade_HOM_SNAPSHOT  ON (  NAME = 'DEV_INFG_CelulaQualidade_HOM_DATA', FILENAME ='E:\Snapshots\DEV_INFG_CelulaQualidade_HOM_snapshot.ss') AS SNAPSHOT OF DEV_INFG_CelulaQualidade_HOM ;

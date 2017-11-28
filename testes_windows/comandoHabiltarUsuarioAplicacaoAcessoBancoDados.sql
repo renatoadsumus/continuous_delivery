@@ -1,0 +1,1 @@
+alter login backup_Tempo_real enable;

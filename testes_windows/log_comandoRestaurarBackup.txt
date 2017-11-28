@@ -1,0 +1,6 @@
+35 percent processed.
+70 percent processed.
+100 percent processed.
+Processed 360 pages for database 'DEV_INFG_CelulaQualidade_DSV', file 'DEV_INFG_CelulaQualidade_DSV_data' on file 1.
+Processed 2 pages for database 'DEV_INFG_CelulaQualidade_DSV', file 'DEV_INFG_CelulaQualidade_DSV_log' on file 1.
+RESTORE DATABASE successfully processed 362 pages in 0.074 seconds (38.125 MB/sec).

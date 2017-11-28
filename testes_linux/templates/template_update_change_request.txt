@@ -1,0 +1,37 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+xmlns:wrap="http://wrappers.webservice.appservices.core.inteqnet.com"
+xmlns:xsd="http://beans.webservice.appservices.core.inteqnet.com/xsd">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <wrap:updateChangeRequest>
+
+         <wrap:credentials>
+
+            <xsd:userName>jenkinsqa</xsd:userName>
+            <xsd:userPassword>InfoGlobo2016</xsd:userPassword>
+         </wrap:credentials>
+
+         <wrap:extendedSettings>
+
+            <xsd:responseFormat>JSON?</xsd:responseFormat>
+         </wrap:extendedSettings>
+
+         <wrap:chgBean>
+         <xsd:assigned_group_id>$EQUIPE_ID</xsd:assigned_group_id>
+         <xsd:row_id>$ROW_ID</xsd:row_id>
+         <xsd:ticket_identifier>$TICKET_IDENTIFIER</xsd:ticket_identifier>
+
+          <xsd:custom_attributes>
+            <xsd:attribute_name>executor da mudanca</xsd:attribute_name>
+            <xsd:attribute_value>$EXECUTOR_MUDANCA</xsd:attribute_value>
+          </xsd:custom_attributes>
+
+          <xsd:plan_for_implementation>$PLAN_IMPLEMENTATION</xsd:plan_for_implementation>
+          <xsd:back_out_plan>$PLAN_IMPLEMENTATION</xsd:back_out_plan>
+
+         <xsd:planned_end_date>$END_DATE</xsd:planned_end_date>
+         <xsd:planned_start_date>$START_DATE</xsd:planned_start_date>
+         </wrap:chgBean>
+      </wrap:updateChangeRequest>
+   </soapenv:Body>
+</soapenv:Envelope>

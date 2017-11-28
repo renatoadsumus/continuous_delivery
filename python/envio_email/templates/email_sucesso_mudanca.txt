@@ -1,0 +1,18 @@
+A solicitacao de mudancas CHG# $NUMERO_MUDANCA foi criada pelo GoCD.
+
+Descricao : Deploy para PRD do projeto  $NOME_PROJETO - Versao $GO_PIPELINE_LABEL
+
+Servico Afetado:  $CCTI_CLASS  - $CCTI_CATEGORY
+
+A mudanca sera executada nesse momento.
+
+Link da mudanca: https://csm3.serviceaide.com/#WORKSPACES-SERVICE-DESK-Global-Search/searchWorkspaceKey=$NUMERO_MUDANCA
+
+Link Pipeline GoCd: $PIPELINE_GO
+
+
+Em caso de duvidas, favor entrar em contato com o Gestor de mudancas pelo email gestaodemudancas@infoglobo.com.br
+
+Atenciosamente, 
+
+Tecnologia - INFOGLOBO

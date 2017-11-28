@@ -1,0 +1,29 @@
+ <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+ xmlns:wrap="http://wrappers.webservice.appservices.core.inteqnet.com"
+ xmlns:xsd="http://beans.webservice.appservices.core.inteqnet.com/xsd">
+   <soap:Header/>
+   <soap:Body>
+      <wrap:createChangeRequest>
+         <wrap:credentials>
+            <xsd:userName>jenkinsqa</xsd:userName>
+            <xsd:userPassword>InfoGlobo2016</xsd:userPassword>
+         </wrap:credentials>
+         <wrap:extendedSettings>
+            <xsd:responseFormat>JSON?</xsd:responseFormat>
+         </wrap:extendedSettings>
+         <wrap:chgBean>
+
+          <xsd:ccti_class>$CCTI_CLASS</xsd:ccti_class>
+            <xsd:ccti_category>$CCTI_CATEGORY</xsd:ccti_category>
+            <xsd:ccti_type>$CCTI_TYPE</xsd:ccti_type>
+            <xsd:ccti_item>$CCTI_ITEM</xsd:ccti_item>
+            <xsd:ticket_status>Active</xsd:ticket_status>
+            <xsd:ticket_phase>Queued</xsd:ticket_phase>
+            <xsd:ticket_reason_code>In Progress</xsd:ticket_reason_code>
+            <xsd:requester_name>$REQUESTER_NAME</xsd:requester_name>
+            <xsd:ticket_description>$TICKET_DESCRIPTION</xsd:ticket_description>
+            <xsd:change_subtype>$CHANGE_SUBTYPE</xsd:change_subtype>
+         </wrap:chgBean>
+      </wrap:createChangeRequest>
+   </soap:Body>
+</soap:Envelope>

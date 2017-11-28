@@ -1,0 +1,671 @@
+  <pipelines group="[PIPELINE_GROUP_NAME]">
+    <authorization>
+      <view>
+        <role>receitas_digitais</role>
+      </view>
+      <operate>
+        <role>receitas_digitais</role>
+      </operate>
+    </authorization>
+    <pipeline name="[PIPELINE_NAME]_commit_stage" labeltemplate="Revision-${[MATERIAL_NAME_PROJETO]}" isLocked="false">
+      <materials>
+        <svn url="[SVN_PROJETO]" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="[NOME_PROJETO]" materialName="[MATERIAL_NAME_PROJETO]" />
+        <svn url="http://infosvn.ogmaster.local/svn/EquipeQA/continuous_delivery/branches/codigo_validado/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="scripts" materialName="scripts">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+      </materials>
+      <stage name="testes_unitarios" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="JAVA_HOME">
+            <value>/usr/lib/jvm/java6</value>
+          </variable>
+          <variable name="BUILDER">
+            <value>GRAILS</value>
+          </variable>
+          <variable name="GRAILS_HOME">
+            <value>/opt/grails-2.3.11</value>
+          </variable>
+          <variable name="ARQUIVO_PARA_BUILD">
+            <value>application.properties</value>
+          </variable>
+          <variable name="CATALINA_HOME">
+            <value>/tmp/classificados</value>
+          </variable>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="executar_testes">
+            <tasks>
+              <exec command="/bin/bash" workingdir="[NOME_PROJETO]">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u ../scripts/python/scripts/executar_testes_unitarios.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+            <artifacts>
+              <test src="**/target/test-reports/TESTS-TestSuites.xml" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="gerar_pacote" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="JAVA_HOME">
+            <value>/usr/lib/jvm/java6</value>
+          </variable>
+          <variable name="BUILDER">
+            <value>GRAILS</value>
+          </variable>
+          <variable name="GRAILS_HOME">
+            <value>/opt/grails-2.3.11</value>
+          </variable>
+          <variable name="ARQUIVO_PARA_BUILD">
+            <value>application.properties</value>
+          </variable>
+          <variable name="CATALINA_HOME">
+            <value>/tmp/classificados</value>
+          </variable>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="gerar_pacote">
+            <tasks>
+              <exec command="/bin/bash" workingdir="[NOME_PROJETO]">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u ../scripts/python/scripts/fechar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash" workingdir="[NOME_PROJETO]/target">
+                <arg>-c</arg>
+                <arg>mv *.war [NOME_PROJETO].war</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+            <artifacts>
+              <artifact src="**/target/[NOME_PROJETO].war" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="sonar" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="JAVA_HOME">
+            <value>/usr/lib/jvm/jre7</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="sonar">
+            <tasks>
+              <exec command="/bin/bash" workingdir="[NOME_PROJETO]">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u ../scripts/python/scripts/executar_sonar.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="[PIPELINE_NAME]_integracao" labeltemplate="${[MATERIAL_NAME_PROJETO]}" isLocked="true">
+      <materials>
+        <svn url="http://infosvn.ogmaster.local/svn/EquipeQA/continuous_delivery/branches/codigo_validado/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="scripts" materialName="scripts">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+        <svn url="http://infosvn.ogmaster.local/svn/PortalMercadoAnunciante/testes-aceitacao-ofertas/trunk" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="testes_aceitacao" materialName="testes_aceitacao">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+        <pipeline pipelineName="[PIPELINE_NAME]_commit_stage" stageName="gerar_pacote" materialName="[MATERIAL_NAME_PROJETO]" />
+      </materials>
+      <stage name="deploy_integracao" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="DIRETORIO_CHAVES_SERVIDORES">
+            <value>/home/tfsservice/.ssh/</value>
+          </variable>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="ContextPath">
+            <value>[CONTEXT_PATH]</value>
+          </variable>
+          <variable name="DominioTomcat">
+            <value>int-classificados</value>
+          </variable>
+          <variable name="ServidorPortaTomcat">
+            <value>infotomdsv3:8080</value>
+          </variable>
+          <variable name="AplicacaoParar">
+            <value>""</value>
+          </variable>
+          <variable name="TempoEsperar">
+            <value>5</value>
+          </variable>
+          <variable name="UsuarioTomcat">
+            <value>deployclassif</value>
+          </variable>
+          <variable name="ArquivoChaveSSH">
+            <value>id_rsa</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TOMCAT</value>
+          </variable>
+          <variable name="SENHA_TOMCAT" secure="true">
+            <encryptedValue>OeGxh3V1wZAC7SrDoxhFVA==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="deploy">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage" stage="gerar_pacote" job="gerar_pacote" srcfile="[MATERIAL_NAME_PROJETO].war">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="smoke_tests" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="JAVA_HOME">
+            <value>E:\jdk1.6.0_45</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="testes">
+            <tasks>
+              <exec command="mvn" workingdir="testes_aceitacao">
+                <arg>clean</arg>
+                <arg>test</arg>
+                <arg>-Dtest=[RUNNER_SMOKE_TESTE]</arg>
+                <arg>-P int</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>windows3_teste_funcional</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="[PIPELINE_NAME]_staging" labeltemplate="${[MATERIAL_NAME_PROJETO]}" isLocked="true">
+      <materials>
+        <svn url="http://infosvn.ogmaster.local/svn/EquipeQA/continuous_delivery/branches/codigo_validado/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="scripts" materialName="scripts">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+        <svn url="http://infosvn.ogmaster.local/svn/PortalMercadoAnunciante/testes-aceitacao-ofertas/trunk" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="testes_aceitacao" materialName="testes_aceitacao">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+        <pipeline pipelineName="[PIPELINE_NAME]_integracao" stageName="smoke_tests" materialName="[MATERIAL_NAME_PROJETO]" />
+      </materials>
+      <stage name="deploy_staging" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="DIRETORIO_CHAVES_SERVIDORES">
+            <value>/home/tfsservice/.ssh/</value>
+          </variable>
+          <variable name="ContextPath">
+            <value>[CONTEXT_PATH]</value>
+          </variable>
+          <variable name="DominioTomcat">
+            <value>infotomqa1.ogmaster.local</value>
+          </variable>
+          <variable name="ServidorPortaTomcat">
+            <value>infotomqa1:8080</value>
+          </variable>
+          <variable name="AplicacaoParar">
+            <value>""</value>
+          </variable>
+          <variable name="TempoEsperar">
+            <value>5</value>
+          </variable>
+          <variable name="UsuarioTomcat">
+            <value>deployclassif</value>
+          </variable>
+          <variable name="ArquivoChaveSSH">
+            <value>id_rsa</value>
+          </variable>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>classificados</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TOMCAT</value>
+          </variable>
+          <variable name="SENHA_TOMCAT" secure="true">
+            <encryptedValue>OeGxh3V1wZAC7SrDoxhFVA==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="deploy">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage/[PIPELINE_NAME]_integracao" stage="gerar_pacote" job="gerar_pacote" srcfile="[NOME_PROJETO].war">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/atualizar_informacoes_stg_entrega_continua.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="testes_regressivos" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="JAVA_HOME">
+            <value>E:\jdk1.6.0_45</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="testes">
+            <tasks>
+              <exec command="mvn" workingdir="testes_aceitacao">
+                <arg>clean</arg>
+                <arg>test</arg>
+                <arg>-Dtest=[RUNNER_TESTE]</arg>
+                <arg>-Pqlt</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>windows3_teste_funcional</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="testes_performance" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="JAVA_HOME">
+            <value>/usr/lib/jvm/java6</value>
+          </variable>
+          <variable name="ArquivoChaveSSH">
+            <value>id_rsa</value>
+          </variable>
+          <variable name="JmeterTeste">
+            <value>[JMETER_TESTE]</value>
+          </variable>
+          <variable name="ArquivoCsv">
+            <value>[JMETER_TESTE].csv</value>
+          </variable>
+          <variable name="ArquivoLimites">
+            <value>limite-classificados-ofertas.conf</value>
+          </variable>
+          <variable name="DIRETORIO_CHAVES_SERVIDORES">
+            <value>/home/tfsservice/.ssh/</value>
+          </variable>
+          <variable name="GO_JOB_PARA_ANALISE">
+            <value>executar_performance</value>
+          </variable>
+          <variable name="senhaJmeter" secure="true">
+            <encryptedValue>eOnnYXRDXrQ=</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="executar_performance">
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/executar_testes_performance.py -arquivoChaveSSH=${ArquivoChaveSSH} -jmeterTeste=${JmeterTeste} -arquivoCsv=${ArquivoCsv} -arquivoLimites=${ArquivoLimites} -senhaJmeter=${senhaJmeter}</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/analisar_console_log.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="analise_log" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="Servidor">
+            <value>infotomqa1</value>
+          </variable>
+          <variable name="DiretorioCompartilhamento">
+            <value>/var/log/tomcat.classificados/</value>
+          </variable>
+          <variable name="PerfilExecucao">
+            <value>Classificados</value>
+          </variable>
+          <variable name="QuantidadeTop">
+            <value>10</value>
+          </variable>
+          <variable name="GO_JOB_PARA_ANALISE">
+            <value>analise_log</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="analise_log">
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>sh scripts/shell/analise_log.sh ${Servidor} ${DiretorioCompartilhamento} ${PerfilExecucao} ${QuantidadeTop} | tee output.txt</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/analisar_console_log.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="[PIPELINE_NAME]_producao" labeltemplate="${[MATERIAL_NAME_PROJETO]}" isLocked="true">
+      <materials>
+        <svn url="http://infosvn.ogmaster.local/svn/EquipeQA/continuous_delivery/branches/codigo_validado/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="scripts" materialName="scripts">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+        <pipeline pipelineName="[PIPELINE_NAME]_staging" stageName="analise_log" materialName="[MATERIAL_NAME_PROJETO]" />
+        <svn url="http://infosvn.ogmaster.local/svn/PortalMercadoAnunciante/testes-aceitacao-ofertas/trunk" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="testes_aceitacao" materialName="testes_aceitacao">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+      </materials>
+      <stage name="abertura_mudanca" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="CCTI_CLASS">
+            <value>SISTEMAS - ÁREA DE MERCADO</value>
+          </variable>
+          <variable name="CCTI_CATEGORY">
+            <value>Site Classificados do Rio</value>
+          </variable>
+          <variable name="CCTI_TYPE">
+            <value>Automática</value>
+          </variable>
+          <variable name="CCTI_ITEM">
+            <value>Software</value>
+          </variable>
+          <variable name="ID_FILA_EQUIPE">
+            <value>32</value>
+          </variable>
+          <variable name="DESTINATARIOS_EMAIL">
+            <value>receitas.digitais.dev@infoglobo.com.br</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>classificados</value>
+          </variable>
+          <variable name="NOME_PROJETO">
+            <value>oferta_mix</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="abertura_mudanca">
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/criar_mudanca_automatica.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="deploy_producao_servidor_1" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="ContextPath">
+            <value>[CONTEXT_PATH]</value>
+          </variable>
+          <variable name="DominioTomcat">
+            <value>CMAH06INF24</value>
+          </variable>
+          <variable name="ServidorPortaTomcat">
+            <value>CMAH06INF24:8080</value>
+          </variable>
+          <variable name="AplicacaoParar">
+            <value>healthcheck</value>
+          </variable>
+          <variable name="TempoEsperar">
+            <value>30</value>
+          </variable>
+          <variable name="UsuarioTomcat">
+            <value>deploycpub</value>
+          </variable>
+          <variable name="ArquivoChaveSSH">
+            <value>id_rsa</value>
+          </variable>
+          <variable name="DIRETORIO_CHAVES_SERVIDORES">
+            <value>/home/tfsservice/.ssh/</value>
+          </variable>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>classificados</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TOMCAT</value>
+          </variable>
+          <variable name="DESTINATARIOS_EMAIL">
+            <value>receitas.digitais.dev@infoglobo.com.br</value>
+          </variable>
+          <variable name="SENHA_TOMCAT" secure="true">
+            <encryptedValue>grsDCnwLmLEw2i8oe95n/A==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="deploy">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage/[PIPELINE_NAME]_integracao/[PIPELINE_NAME]_staging" stage="gerar_pacote" job="gerar_pacote" srcfile="[NOME_PROJETO].war">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="deploy_producao_servidor_2" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="ContextPath">
+            <value>[CONTEXT_PATH]</value>
+          </variable>
+          <variable name="DominioTomcat">
+            <value>CMAH06INF25</value>
+          </variable>
+          <variable name="ServidorPortaTomcat">
+            <value>CMAH06INF25:8080</value>
+          </variable>
+          <variable name="AplicacaoParar">
+            <value>healthcheck</value>
+          </variable>
+          <variable name="TempoEsperar">
+            <value>30</value>
+          </variable>
+          <variable name="UsuarioTomcat">
+            <value>deploycpub</value>
+          </variable>
+          <variable name="ArquivoChaveSSH">
+            <value>id_rsa</value>
+          </variable>
+          <variable name="DIRETORIO_CHAVES_SERVIDORES">
+            <value>/home/tfsservice/.ssh/</value>
+          </variable>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>classificados</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TOMCAT</value>
+          </variable>
+          <variable name="SENHA_TOMCAT" secure="true">
+            <encryptedValue>grsDCnwLmLEw2i8oe95n/A==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="deploy">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage/[PIPELINE_NAME]_integracao/[PIPELINE_NAME]_staging" stage="gerar_pacote" job="gerar_pacote" srcfile="[NOME_PROJETO].war">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="deploy_producao_servidor_3" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="ContextPath">
+            <value>[CONTEXT_PATH]</value>
+          </variable>
+          <variable name="DominioTomcat">
+            <value>cmah06inf31</value>
+          </variable>
+          <variable name="ServidorPortaTomcat">
+            <value>cmah06inf31:8080</value>
+          </variable>
+          <variable name="AplicacaoParar">
+            <value>healthcheck</value>
+          </variable>
+          <variable name="TempoEsperar">
+            <value>30</value>
+          </variable>
+          <variable name="UsuarioTomcat">
+            <value>deploycpub</value>
+          </variable>
+          <variable name="ArquivoChaveSSH">
+            <value>id_rsa</value>
+          </variable>
+          <variable name="DIRETORIO_CHAVES_SERVIDORES">
+            <value>/home/tfsservice/.ssh/</value>
+          </variable>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>classificados</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TOMCAT</value>
+          </variable>
+          <variable name="SENHA_TOMCAT" secure="true">
+            <encryptedValue>grsDCnwLmLEw2i8oe95n/A==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="deploy">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage/[PIPELINE_NAME]_integracao/[PIPELINE_NAME]_staging" stage="gerar_pacote" job="gerar_pacote" srcfile="[NOME_PROJETO].war">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/atualizar_informacoes_prd_entrega_continua.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="nagios" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="UsuarioSSH">
+            <value>tfsservice</value>
+          </variable>
+          <variable name="ServidorSSH">
+            <value>infomon</value>
+          </variable>
+          <variable name="SenhaSSH" secure="true">
+            <encryptedValue>6sh0I5qUpSuL4HVgfsRNVA==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="nagios">
+            <tasks>
+              <exec command="svn" workingdir="scripts">
+                <arg>up</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/nagios_validar_configuracao.py</arg>
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+  </pipelines>

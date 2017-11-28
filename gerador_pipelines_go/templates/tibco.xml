@@ -1,0 +1,684 @@
+<pipelines group="[PIPELINE_GROUP_NAME]">
+    <authorization>
+      <view>
+        <role>integracao</role>
+      </view>
+      <operate>
+        <role>integracao</role>
+      </operate>
+    </authorization>
+    <pipeline name="[PIPELINE_NAME]_commit_stage" labeltemplate="Revision-${[MATERIAL_NAME_PROJETO]}" isLocked="false">
+      <materials>
+        <svn url="[RAIZ_SVN_PROJETO]/trunk/Fontes/[NOME_PROJETO]" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="[NOME_PROJETO]" materialName="[MATERIAL_NAME_PROJETO]" />
+        <pipeline pipelineName="integracao_infoglobo_commons_atualizacao" stageName="atualizacao" materialName="infoglobo_commons" />
+        <svn url="http://infosvn.ogmaster.local/svn/EquipeQA/continuous_delivery/branches/codigo_validado/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="scripts" materialName="scripts">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+      </materials>
+      <stage name="validacao" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="BUILDER">
+            <value>TIBCO</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="executar_testes">
+            <tasks>
+              <fetchartifact pipeline="integracao_infoglobo_commons_atualizacao" stage="atualizacao" job="atualizacao" srcdir="infoglobo_commons">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="powershell">
+                <arg>. $env:DIRETORIO_PYVENV\Scripts\Activate.ps1; python -u .\scripts\python\scripts\executar_testes_unitarios.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>windows3</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="gerar_pacote" fetchMaterials="false">
+        <environmentvariables>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="BUILDER">
+            <value>TIBCO</value>
+          </variable>
+          <variable name="INDEXACAO_LOG_EXECUCAO">
+            <value>[INDEXACAO_LOG_EXECUCAO]</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="gerar_pacote">
+            <tasks>
+              <exec command="powershell">
+                <arg>. $env:DIRETORIO_PYVENV\Scripts\Activate.ps1; python -u .\scripts\python\scripts\fechar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>windows3</resource>
+            </resources>
+            <artifacts>
+              <artifact src="[NOME_PROJETO].ear" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="[PIPELINE_NAME]_integracao" labeltemplate="${artefato_tibco}" isLocked="true">
+      <materials>
+        <pipeline pipelineName="[PIPELINE_NAME]_commit_stage" stageName="gerar_pacote" materialName="artefato_tibco" />
+        <svn url="[RAIZ_SVN_PROJETO]/trunk/xml_configuracao/int/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="xml_configuracao" materialName="xml_configuracao" />
+        <svn url="[RAIZ_SVN_PROJETO]/trunk/Testes/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="xml_testes" materialName="xml_testes" />
+        <svn url="http://infosvn.ogmaster.local/svn/EquipeQA/continuous_delivery/branches/codigo_validado/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="scripts" materialName="scripts">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+      </materials>
+      <stage name="implantar_ear" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TIBCO</value>
+          </variable>
+          <variable name="ESTRUTURA_PASTA_TIBCO">
+            <value>[ESTRUTURA_PASTA_INT]</value>
+          </variable>
+          <variable name="SERVIDOR_DEPLOY">
+            <value>infotbcdsv</value>
+          </variable>
+          <variable name="SERVIDOR_MASTER">
+            <value>infotbcdsv</value>
+          </variable>
+          <variable name="UsuarioSSH">
+            <value>tibco</value>
+          </variable>
+          <variable name="INDEXACAO_LOG_EXECUCAO">
+            <value>[INDEXACAO_LOG_EXECUCAO]</value>
+          </variable>
+          <variable name="SENHA_SSH" secure="true">
+            <encryptedValue>Y6doNqHEe+e6lwzpXUDBPA==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="implantar_ear">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage" stage="gerar_pacote" job="gerar_pacote" srcfile="[NOME_PROJETO].ear">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="smoke_tests">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="XML_PROJETO">
+            <value>xml_testes/[NOME_XML_TESTES]</value>
+          </variable>
+          <variable name="ENDPOINT_TESTES">
+            <value>[ENDPOINT_TESTES_INT]</value>
+          </variable>
+          <variable name="ESTRUTURA_PASTA_TIBCO">
+            <value>[ESTRUTURA_PASTA_INT]</value>
+          </variable>
+          <variable name="TEST_SUIT">
+            <value>SmokeTests</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="smoke_tests">
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/executar_smoke_tests_soapui.py</arg>
+                <runif status="passed" />
+              </exec>              
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>mv TEST-*.xml relatorio-smoke-tests.xml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+            <artifacts>
+              <artifact src="relatorio-smoke-tests.xml" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="metricas_qualidade" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>integracao</value>
+          </variable>
+          <variable name="METODO_ARMAZENAMENTO_INFO_TESTES">
+            <value>RELATORIO_SOAPUI/MAVEN</value>
+          </variable>
+          <variable name="DESTINATARIOS_EMAIL">
+            <value>devops@infoglobo.com.br,integracao@infoglobo.com.br</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="monitorar">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_GROUP_NAME]_integracao" stage="smoke_tests" job="smoke_tests" srcfile="relatorio-smoke-tests.xml">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u ./scripts/python/scripts/monitorar_atualizar_quantidade_testes.py</arg>
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="[PIPELINE_NAME]_staging" labeltemplate="${artefato_tibco}" isLocked="true">
+      <materials>
+        <svn url="[RAIZ_SVN_PROJETO]/trunk/xml_configuracao/stg/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="xml_configuracao" materialName="xml_configuracao" />
+        <svn url="[RAIZ_SVN_PROJETO]/trunk/Testes/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="xml_testes" materialName="xml_testes" />
+        <pipeline pipelineName="[PIPELINE_NAME]_integracao" stageName="smoke_tests" materialName="artefato_tibco" />
+        <svn url="http://infosvn.ogmaster.local/svn/EquipeQA/continuous_delivery/branches/codigo_validado/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="scripts" materialName="scripts">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+      </materials>
+      <stage name="implantar_ear" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TIBCO</value>
+          </variable>
+          <variable name="ESTRUTURA_PASTA_TIBCO">
+            <value>[ESTRUTURA_PASTA_STG]</value>
+          </variable>
+          <variable name="SERVIDOR_DEPLOY">
+            <value>infotbcqlt</value>
+          </variable>
+          <variable name="SERVIDOR_MASTER">
+            <value>infotbcqlt</value>
+          </variable>          
+          <variable name="NOME_EQUIPE">
+            <value>integracao</value>
+          </variable>
+          <variable name="UsuarioSSH">
+            <value>tibco</value>
+          </variable>
+          <variable name="SENHA_SSH" secure="true">
+            <encryptedValue>Y6doNqHEe+e6lwzpXUDBPA==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="implantar_ear">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage/[PIPELINE_NAME]_integracao" stage="gerar_pacote" job="gerar_pacote" srcfile="[NOME_PROJETO].ear">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="implantar_ear_infotbcqlt2" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TIBCO</value>
+          </variable>
+          <variable name="ESTRUTURA_PASTA_TIBCO">
+            <value>INFOGLOBO/ControleAcesso/[NOME_PROJETO]_infotbcqlt2</value>
+          </variable>
+          <variable name="SERVIDOR_DEPLOY">
+            <value>infotbcqlt2</value>
+          </variable>
+          <variable name="SERVIDOR_MASTER">
+            <value>infotbcqlt</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>integracao</value>
+          </variable>
+          <variable name="UsuarioSSH">
+            <value>tibco</value>
+          </variable>
+          <variable name="INDEXACAO_LOG_EXECUCAO">
+            <value>[INDEXACAO_LOG_EXECUCAO]</value>
+          </variable>
+          <variable name="SENHA_SSH" secure="true">
+            <encryptedValue>Y6doNqHEe+e6lwzpXUDBPA==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="implantar_ear_infotbcqlt2">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage/[PIPELINE_NAME]_integracao" stage="gerar_pacote" job="gerar_pacote" srcfile="[NOME_PROJETO].ear">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/atualizar_informacoes_stg_entrega_continua.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="testes_funcionais">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="XML_PROJETO">
+            <value>xml_testes/[NOME_XML_TESTES]</value>
+          </variable>
+          <variable name="ENDPOINT_TESTES">
+            <value>[ENDPOINT_TESTES_STG]</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="smoke_tests">
+            <environmentvariables>
+              <variable name="TEST_SUIT">
+                <value>SmokeTests</value>
+              </variable>
+            </environmentvariables>
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/executar_smoke_tests_soapui.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+          <job name="testes_regressivos">
+            <environmentvariables>
+              <variable name="TEST_SUIT">
+                <value>Regressivos</value>
+              </variable>
+            </environmentvariables>
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/executar_smoke_tests_soapui.py</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>mv TEST-Regressivos.xml relatorio-testes-regressivos.xml</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+            <artifacts>
+              <artifact src="relatorio-testes-regressivos.xml" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="analise_de_log_tra">
+        <environmentvariables>
+          <variable name="USUARIO_SSH">
+            <value>tfsservice</value>
+          </variable>
+          <variable name="SERVIDOR">
+            <value>infotbcqlt</value>
+          </variable>
+          <variable name="CAMINHO">
+            <value>/opt/tibco/deploy/scripts</value>
+          </variable>
+          <variable name="COMANDO">
+            <value>Check_TRA_Logs.sh</value>
+          </variable>
+          <variable name="PARAMETROS">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="ARQUIVO_CHAVE_SSH">
+            <value>teste.ppk</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="analise_de_log_tra">
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/executar_comando_via_ssh.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="metricas_qualidade" cleanWorkingDir="true">
+        <environmentvariables>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>integracao</value>
+          </variable>
+          <variable name="METODO_ARMAZENAMENTO_INFO_TESTES">
+            <value>RELATORIO_SOAPUI/MAVEN</value>
+          </variable>
+          <variable name="DESTINATARIOS_EMAIL">
+            <value>devops@infoglobo.com.br,integracao@infoglobo.com.br</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="monitorar">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_GROUP_NAME]_staging" stage="testes_funcionais" job="testes_regressivos" srcfile="relatorio-testes-regressivos.xml">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u ./scripts/python/scripts/monitorar_atualizar_quantidade_testes.py</arg>
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      </pipeline>
+    <pipeline name="[PIPELINE_NAME]_producao" labeltemplate="${artefato_tibco}" isLocked="true">
+      <materials>
+        <svn url="[RAIZ_SVN_PROJETO]/trunk/xml_configuracao/prd/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="xml_configuracao" materialName="xml_configuracao" />
+        <pipeline pipelineName="[PIPELINE_NAME]_staging" stageName="analise_de_log_tra" materialName="artefato_tibco" />
+        <svn url="http://infosvn.ogmaster.local/svn/EquipeQA/continuous_delivery/branches/codigo_validado/" username="jenkinssvn" encryptedPassword="xiFPyR3TO95O6ZoUQkLBYw==" dest="scripts" materialName="scripts">
+          <filter>
+            <ignore pattern="**/*" />
+          </filter>
+        </svn>
+      </materials>
+      <stage name="abertura_mudanca" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="CCTI_CLASS">
+            <value>[CCTI_CLASS]</value>
+          </variable>
+          <variable name="CCTI_CATEGORY">
+            <value>[CCTI_CATEGORY]</value>
+          </variable>
+          <variable name="CCTI_TYPE">
+            <value>[CCTI_TYPE]</value>
+          </variable>
+          <variable name="CCTI_ITEM">
+            <value>[CCTI_ITEM]</value>
+          </variable>
+          <variable name="DESTINATARIOS_EMAIL">
+            <value>integracao@infoglobo.com.br</value>
+          </variable>
+          <variable name="ID_FILA_EQUIPE">
+            <value>50</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>integracao</value>
+          </variable>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="abertura_mudanca">
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/criar_mudanca_automatica.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="implantar_ear_[SERVIDOR_DEPLOY_1]" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TIBCO</value>
+          </variable>
+          <variable name="ESTRUTURA_PASTA_TIBCO">
+            <value>[ESTRUTURA_PASTA_PRD]</value>
+          </variable>
+          <variable name="SERVIDOR_DEPLOY">
+            <value>[SERVIDOR_DEPLOY_1]</value>
+          </variable>
+          <variable name="UsuarioSSH">
+            <value>tibco</value>
+          </variable>
+          <variable name="DESTINATARIOS_EMAIL">
+            <value>integracao@infoglobo.com.br</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>integracao</value>
+          </variable>
+          <variable name="SERVIDOR_LOADBALANCE">
+            <value>cmainfvlb2</value>
+          </variable>
+          <variable name="BACKEND">
+            <value>b83</value>
+          </variable>
+          <variable name="SERVIDOR_BACKEND">
+            <value>tbc1</value>
+          </variable>
+          <variable name="SERVIDOR_MASTER">
+            <value>infotbc1</value>
+          </variable>
+          <variable name="SENHA_SSH" secure="true">
+            <encryptedValue>Y6doNqHEe+e6lwzpXUDBPA==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="implantar_ear">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage/[PIPELINE_NAME]_integracao/[PIPELINE_NAME]_staging" stage="gerar_pacote" job="gerar_pacote" srcfile="[NOME_PROJETO].ear">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/manipulador_load_balance_tibco.py "-etapa=pre_deploy"</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="habilitar_balance_tbc1" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="SERVIDOR_LOADBALANCE">
+            <value>cmainfvlb2</value>
+          </variable>
+          <variable name="BACKEND">
+            <value>b83</value>
+          </variable>
+          <variable name="SERVIDOR_BACKEND">
+            <value>tbc1</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="habilitar_porta">
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/manipulador_load_balance_tibco.py "-etapa=pos_deploy"</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="implantar_ear_[SERVIDOR_DEPLOY_2]" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="NOME_PROJETO">
+            <value>[NOME_PROJETO]</value>
+          </variable>
+          <variable name="IMPLANTADOR">
+            <value>TIBCO</value>
+          </variable>
+          <variable name="ESTRUTURA_PASTA_TIBCO">
+            <value>[ESTRUTURA_PASTA_PRD]</value>
+          </variable>
+          <variable name="SERVIDOR_DEPLOY">
+            <value>[SERVIDOR_DEPLOY_2]</value>
+          </variable>
+          <variable name="UsuarioSSH">
+            <value>tibco</value>
+          </variable>
+          <variable name="DESTINATARIOS_EMAIL">
+            <value>integracao@infoglobo.com.br</value>
+          </variable>
+          <variable name="NOME_EQUIPE">
+            <value>integracao</value>
+          </variable>
+          <variable name="SERVIDOR_LOADBALANCE">
+            <value>cmainfvlb2</value>
+          </variable>
+          <variable name="BACKEND">
+            <value>b83</value>
+          </variable>
+          <variable name="SERVIDOR_BACKEND">
+            <value>tbc2</value>
+          </variable>
+          <variable name="SERVIDOR_MASTER">
+            <value>infotbc1</value>
+          </variable>
+          <variable name="INDEXACAO_LOG_EXECUCAO">
+            <value>[INDEXACAO_LOG_EXECUCAO]</value>
+          </variable>
+          <variable name="SENHA_SSH" secure="true">
+            <encryptedValue>Y6doNqHEe+e6lwzpXUDBPA==</encryptedValue>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="implantar_ear">
+            <tasks>
+              <fetchartifact pipeline="[PIPELINE_NAME]_commit_stage/[PIPELINE_NAME]_integracao/[PIPELINE_NAME]_staging" stage="gerar_pacote" job="gerar_pacote" srcfile="[NOME_PROJETO].ear">
+                <runif status="passed" />
+              </fetchartifact>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/manipulador_load_balance_tibco.py "-etapa=pre_deploy"</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/implantar_artefato.py</arg>
+                <runif status="passed" />
+              </exec>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/atualizar_informacoes_prd_entrega_continua.py</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="habilitar_balance_tbc2" cleanWorkingDir="true">
+        <approval type="manual" />
+        <environmentvariables>
+          <variable name="SERVIDOR_LOADBALANCE">
+            <value>cmainfvlb2</value>
+          </variable>
+          <variable name="BACKEND">
+            <value>b83</value>
+          </variable>
+          <variable name="SERVIDOR_BACKEND">
+            <value>tbc2</value>
+          </variable>
+        </environmentvariables>
+        <jobs>
+          <job name="habilitar_porta">
+            <tasks>
+              <exec command="/bin/bash">
+                <arg>-c</arg>
+                <arg>source /home/tfsservice/continuous_delivery_env/bin/activate; python -u scripts/python/scripts/manipulador_load_balance_tibco.py "-etapa=pos_deploy"</arg>
+                <runif status="passed" />
+              </exec>
+            </tasks>
+            <resources>
+              <resource>linux</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+  </pipelines>

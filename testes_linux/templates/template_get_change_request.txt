@@ -1,0 +1,20 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wrap="http://wrappers.webservice.appservices.core.inteqnet.com" xmlns:xsd="http://beans.webservice.appservices.core.inteqnet.com/xsd">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <wrap:getChangeRequest>
+         <!--Optional:-->
+         <wrap:credentials>
+            <xsd:userName>jenkinsqa</xsd:userName>
+
+            <xsd:userPassword>InfoGlobo2016</xsd:userPassword>
+         </wrap:credentials>
+         <!--Optional:-->
+         <wrap:extendedSettings>
+            <!--Optional:-->
+            <xsd:responseFormat>JSON?</xsd:responseFormat>
+         </wrap:extendedSettings>
+         <!--Optional:-->
+         <wrap:ticketIdentifier>$TICKET_IDENTIFIER</wrap:ticketIdentifier>
+      </wrap:getChangeRequest>
+   </soapenv:Body>
+</soapenv:Envelope>
